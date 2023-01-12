@@ -118,7 +118,7 @@ class BasicToolOperation extends EventListener {
 
   public attributeLockList: string[]; // 属性限制列表
 
-  public allAttributes!:Attribute[];// 多工具所有标签集合
+  public allAttributes!: Attribute[]; // 多工具所有标签集合
 
   public dblClickListener: DblClickEventListener;
 
@@ -287,7 +287,7 @@ class BasicToolOperation extends EventListener {
   /**
    * 多工具全量标签设置
    */
-  public setAllAttributes(allAttributes:Attribute[]){
+  public setAllAttributes(allAttributes: Attribute[]) {
     this.allAttributes = allAttributes;
   }
 
@@ -528,6 +528,19 @@ class BasicToolOperation extends EventListener {
     return {
       x: e.clientX - bounding.left - this.currentPos.x,
       y: e.clientY - bounding.top - this.currentPos.y,
+    };
+  }
+
+  public setDefaultAttribute(attribute: string) {
+    this.defaultAttribute = attribute;
+  }
+
+  public getCoordinateInOrigin(e: MouseEvent) {
+    const bounding = this.canvas.getBoundingClientRect();
+
+    return {
+      x: (e.clientX - bounding.left - this.currentPos.x) / this.zoom,
+      y: (e.clientY - bounding.top - this.currentPos.y) / this.zoom,
     };
   }
 
@@ -1122,7 +1135,7 @@ class BasicToolOperation extends EventListener {
   /** 获取当前属性颜色 */
   public getColor(attribute = '', config = this.config) {
     if (config?.attributeConfigurable === true && this.style.attributeColor) {
-      const attributeIndex = AttributeUtils.getAttributeIndex(attribute, this.allAttributes ?? []) +1;
+      const attributeIndex = AttributeUtils.getAttributeIndex(attribute, this.allAttributes ?? []) + 1;
       return this.style.attributeColor[attributeIndex];
     }
     const { color, toolColor } = this.style;
@@ -1134,7 +1147,7 @@ class BasicToolOperation extends EventListener {
 
   public getLineColor(attribute = '') {
     if (this.config?.attributeConfigurable === true) {
-      const attributeIndex = AttributeUtils.getAttributeIndex(attribute, this.allAttributes ?? []) +1;
+      const attributeIndex = AttributeUtils.getAttributeIndex(attribute, this.allAttributes ?? []) + 1;
       return this.style.attributeLineColor ? this.style.attributeLineColor[attributeIndex] : '';
     }
     const { color, lineColor } = this.style;
@@ -1237,7 +1250,7 @@ class BasicToolOperation extends EventListener {
                   color: item.valid ? toolColor?.valid.stroke : toolColor?.invalid.stroke,
                   ...DEFAULT_TEXT_OFFSET,
                 });
-                if(this.isShowAttributeText){
+                if (this.isShowAttributeText) {
                   const endPoint = transformPointList[transformPointList.length - 1];
                   if (endPoint && endPoint.x) {
                     DrawUtils.drawText(
@@ -1251,8 +1264,6 @@ class BasicToolOperation extends EventListener {
                     );
                   }
                 }
-
-
               }
             });
             break;
@@ -1285,14 +1296,20 @@ class BasicToolOperation extends EventListener {
                   color: item.valid ? toolColor?.valid.stroke : toolColor?.invalid.stroke,
                   ...DEFAULT_TEXT_OFFSET,
                 });
-                if(this.isShowAttributeText){
-                  let ctx = this.canvas.getContext("2d") as CanvasRenderingContext2D;
+                if (this.isShowAttributeText) {
+                  let ctx = this.canvas.getContext('2d') as CanvasRenderingContext2D;
                   ctx?.save();
                   // this.ctx.font = 'italic bold 14px SourceHanSansCN-Regular';
                   ctx.font = DEFAULT_FONT;
                   ctx.fillStyle = item.valid ? toolColor?.valid.stroke : toolColor?.invalid.stroke;
                   ctx.strokeStyle = item.valid ? toolColor?.valid.stroke : toolColor?.invalid.stroke;
-                  DrawUtils.wrapText(this.canvas, item.textAttribute, transformPointList[1].x - LINE_ORDER_OFFSET.x, transformPointList[1].y - LINE_ORDER_OFFSET.y, 200);
+                  DrawUtils.wrapText(
+                    this.canvas,
+                    item.textAttribute,
+                    transformPointList[1].x - LINE_ORDER_OFFSET.x,
+                    transformPointList[1].y - LINE_ORDER_OFFSET.y,
+                    200,
+                  );
                 }
               }
             });
@@ -1329,18 +1346,17 @@ class BasicToolOperation extends EventListener {
                     },
                   );
 
-                  if(this.isShowAttributeText){
+                  if (this.isShowAttributeText) {
                     DrawUtils.drawText(
                       this.canvas,
                       { x: transformPoint.x + width, y: transformPoint.y + width + 24 },
                       item.textAttribute,
                       {
-                        color:item.valid ? toolColor?.valid.stroke : toolColor?.invalid.stroke,
+                        color: item.valid ? toolColor?.valid.stroke : toolColor?.invalid.stroke,
                         ...DEFAULT_TEXT_OFFSET,
                       },
                     );
                   }
-
                 }
               });
             }

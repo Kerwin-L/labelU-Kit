@@ -28,7 +28,11 @@ export const toolList = [
     commonSvg: iconRectPatternSvg,
     selectedSvg: sIconRectPatternSvg,
   },
-  // 多边形工具
+  {
+    toolName: EToolName.Cuboid,
+    commonSvg: iconRectPatternSvg,
+    selectedSvg: sIconRectPatternSvg,
+  },
   {
     toolName: EToolName.Polygon,
     commonSvg: iconPolygonPatternASvg,

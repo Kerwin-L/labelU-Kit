@@ -11,6 +11,8 @@ const DEFAULT_CURRENT_POS = {
 const DEFAULT_ROTATE = 0;
 const DEFAULT_COLOR = '';
 
+
+
 export default class DrawUtils {
   public static drawImg = (
     canvas: HTMLCanvasElement,
@@ -95,14 +97,22 @@ export default class DrawUtils {
       color: string;
       thickness: number;
       lineCap: CanvasLineCap;
-      isShowOrder?:boolean;
-      order?:number;
+      isShowOrder?: boolean;
+      order?: number;
       hiddenText: boolean;
       lineDash: number[];
     }> = {},
   ): void {
     const ctx: CanvasRenderingContext2D = canvas.getContext('2d')!;
-    const { color = DEFAULT_COLOR, thickness = 1, lineCap = 'round', hiddenText = false, lineDash,isShowOrder,order } = options;
+    const {
+      color = DEFAULT_COLOR,
+      thickness = 1,
+      lineCap = 'round',
+      hiddenText = false,
+      lineDash,
+      isShowOrder,
+      order,
+    } = options;
     ctx.save();
     ctx.strokeStyle = color;
     ctx.lineWidth = thickness;
@@ -119,8 +129,8 @@ export default class DrawUtils {
       if (rect.attribute) {
         showText = `${showText}  ${rect.attribute}`;
       }
-      if(isShowOrder){
-        showText = `${order}${showText}`
+      if (isShowOrder) {
+        showText = `${order}${showText}`;
       }
       this.drawText(canvas, { x: rect.x, y: rect.y - 5 }, showText);
       // if (rect.textAttribute) {
@@ -716,5 +726,61 @@ export default class DrawUtils {
   ): void {
     const ctx: CanvasRenderingContext2D = canvas.getContext('2d')!;
     this.drawArrow(ctx, startPoint, endPoint, options);
+  }
+
+  public static drawBox3d(
+    canvas: HTMLCanvasElement,
+    box3d: ICuboid,
+    options: Partial<{
+      color: string;
+      thickness: number;
+      lineCap: CanvasLineCap;
+      isShowOrder?: boolean;
+      order?: number;
+      hiddenText: boolean;
+      lineDash: number[];
+    }> = {},
+  ): void {
+    const ctx: CanvasRenderingContext2D = canvas.getContext('2d')!;
+    const {
+      color = DEFAULT_COLOR,
+      thickness = 1,
+      lineCap = 'round',
+      hiddenText = false,
+      lineDash,
+      isShowOrder,
+      order,
+  } = options;
+    ctx.save();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = thickness;
+    ctx.lineCap = lineCap;
+    if (Array.isArray(lineDash)) {
+      ctx.setLineDash(lineDash);
+    }
+    ctx.fillStyle = color;
+    const { x, y, width, height } = box3d;
+
+    ctx.strokeRect(x, y, width, height);
+
+    if (box3d.sideLine) {
+      const rightTop = {
+        x: x + width,
+        y,
+      };
+  
+      const rightBottom = {
+        x: x + width,
+        y: y + height,
+      };
+
+      const { bottomX, bottomY, topX, topY } = box3d.sideLine;
+
+      // sidebar 
+  
+      
+    }
+
+    ctx.restore();
   }
 }

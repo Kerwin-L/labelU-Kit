@@ -97,7 +97,7 @@ export default class AxisUtils {
    * @param currentPos
    * @returns
    */
-  public static changeRectByZoom(rect: IRect, zoom: number, currentPos: ICoordinate = { x: 0, y: 0 }) {
+  public static changeRectByZoom(rect: IRect | ICuboid, zoom: number, currentPos: ICoordinate = { x: 0, y: 0 }) {
     return {
       ...rect,
       x: rect.x * zoom + currentPos.x,
@@ -141,6 +141,58 @@ export default class AxisUtils {
     return pointList.map((point: IPolygonPoint | IPoint) => {
       return this.changePointByZoom(point, zoom, currentPos);
     });
+  }
+
+  public static changePlanePointByZoom(
+    planePoints: IPlanePoints,
+    zoom: number,
+    currentPos: ICoordinate = { x: 0, y: 0 },
+  ): IPlanePoints {
+    return Object.entries(planePoints).reduce((acc, [key, coord]) => {
+      const newCoord = AxisUtils.changePointByZoom(coord, zoom, currentPos);
+      return {
+        ...acc,
+        [key]: newCoord,
+      };
+    }, {}) as IPlanePoints;
+  }
+
+  /**
+   * 计算点在 zoom 和 currentPos 的转换
+   * @param rect
+   * @param zoom
+   * @param currentPos
+   * @returns
+   */
+  public static changeCuboidByZoom(cuboid: ICuboid, zoom: number, currentPos: ICoordinate = { x: 0, y: 0 }): ICuboid {
+    return {
+      // ...box3d,
+      // x: box3d.x * zoom + currentPos.x,
+      // y: box3d.y * zoom + currentPos.y,
+      // width: box3d.width * zoom,
+      // height: box3d.height * zoom,
+      // sideLine: box3d.sideLine
+      //   ? {
+      //       bottom: {
+      //         x: box3d.sideLine.bottom.x * zoom + currentPos.x,
+      //         y: box3d.sideLine.bottom.y * zoom + currentPos.y,
+      //       },
+      //       top: {
+      //         x: box3d.sideLine.top.x * zoom + currentPos.x,
+      //         y: box3d.sideLine.top.y * zoom + currentPos.y,
+      //       },
+      //     }
+      //   : undefined,
+      ...cuboid,
+      frontPoints: this.changePlanePointByZoom(cuboid.frontPoints, zoom, currentPos),
+      backPoints: cuboid.backPoints
+        ? this.changePlanePointByZoom(cuboid.backPoints, zoom, currentPos)
+        : cuboid.backPoints,
+    };
+  }
+
+  public static transformPlain2PointList({ tl, tr, br, bl }: IPlanePoints) {
+    return [tl, tr, br, bl];
   }
 
   /**

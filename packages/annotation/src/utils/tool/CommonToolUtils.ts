@@ -9,6 +9,7 @@ import TagOperation from '../../core/toolOperation/tagOperation';
 import LineToolOperation from '../../core/toolOperation/LineToolOperation';
 import PointOperation from '../../core/toolOperation/pointOperation';
 import TextToolOperation from '../../core/toolOperation/TextToolOperation';
+import CuboidOperation from '@/core/toolOperation/cuboidOperation';
 
 type point = {
   id: string;
@@ -79,21 +80,20 @@ export default class CommonToolUtils {
     return order;
   }
 
-
-  public static getAllToolsMaxOrder(result:any[],preveResultList:any[]|undefined){
-    let order =0;
-    if(result){
-      for(let item of result){
-        if(item.order > order){
+  public static getAllToolsMaxOrder(result: any[], preveResultList: any[] | undefined) {
+    let order = 0;
+    if (result) {
+      for (let item of result) {
+        if (item.order > order) {
           order = item.order;
         }
       }
     }
-    if(preveResultList){
-      for(let toolResult of preveResultList){
-        if(toolResult.toolName && toolResult.toolName !== 'tagTool'){
-          for(let item of toolResult.result){
-            if(item.order > order){
+    if (preveResultList) {
+      for (let toolResult of preveResultList) {
+        if (toolResult.toolName && toolResult.toolName !== 'tagTool') {
+          for (let item of toolResult.result) {
+            if (item.order > order) {
               order = item.order;
             }
           }
@@ -154,6 +154,8 @@ export default class CommonToolUtils {
         return PointOperation;
       case EToolName.Text:
         return TextToolOperation;
+      case EToolName.Cuboid:
+        return CuboidOperation;
       default:
         throw new Error('not match tool');
     }
