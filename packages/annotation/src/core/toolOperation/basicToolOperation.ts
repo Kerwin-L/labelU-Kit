@@ -1,18 +1,28 @@
-import { isNumber } from 'lodash';
-import localforage from 'localforage';
+import { isNumber } from 'lodash-es';
+// TODO: 将eventBus替换成eventEmitter3
+// import EventEmitter from 'eventemitter3';
+
+import { styleDefaultConfig } from '@/constant/defaultConfig';
+import { DEFAULT_FONT, EToolName } from '@/constant/tool';
+import type { Attribute, PrevResult, ToolConfig } from '@/interface/combineTool';
+import type { IImageAttribute } from '@/types/imgAttributeStore';
+import type { IRenderEnhance, TDataInjectionAtCreateion } from '@/types/tool/annotation';
+import type { ICoordinate, ISize } from '@/types/tool/common';
+import type { ILinePoint } from '@/types/tool/lineTool';
+import type { IPolygonConfig, IPolygonData } from '@/types/tool/polygon';
+import type { IRectConfig } from '@/types/tool/rectTool';
+import MathUtils from '@/utils/MathUtils';
+import AxisUtils, { CoordinateUtils } from '@/utils/tool/AxisUtils';
 import CanvasUtils from '@/utils/tool/CanvasUtils';
 import CommonToolUtils from '@/utils/tool/CommonToolUtils';
-import MathUtils from '@/utils/MathUtils';
-import { styleDefaultConfig } from '@/constant/defaultConfig';
-import AxisUtils, { CoordinateUtils } from '@/utils/tool/AxisUtils';
-import { DEFAULT_FONT, EToolName } from '@/constant/tool';
 import LineToolUtils, { LINE_ORDER_OFFSET } from '@/utils/tool/LineToolUtils';
-import { IPolygonConfig, IPolygonData } from '@/types/tool/polygon';
 import TagUtils from '@/utils/tool/TagUtils';
-import { ToolConfig } from '@/interface/conbineTool';
+
 import { DEFAULT_TEXT_OFFSET, EDragStatus, EGrowthMode, ELang, TEXT_ATTRIBUTE_OFFSET } from '../../constant/annotation';
 import EKeyCode from '../../constant/keyCode';
 import { BASE_ICON, COLORS_ARRAY } from '../../constant/style';
+import locale from '../../locales';
+import { EMessage } from '../../locales/constants';
 import ActionsHistory from '../../utils/ActionsHistory';
 import AttributeUtils from '../../utils/tool/AttributeUtils';
 import DblClickEventListener from '../../utils/tool/DblClickEventListener';
@@ -21,10 +31,8 @@ import ImgPosUtils from '../../utils/tool/ImgPosUtils';
 import RenderDomUtils from '../../utils/tool/RenderDomUtils';
 import ZoomUtils from '../../utils/tool/ZoomUtils';
 import EventListener from './eventListener';
-import locale from '../../locales';
-import { EMessage } from '../../locales/constants';
 
-interface IBasicToolOperationProps {
+export interface IBasicToolOperationProps {
   container: HTMLElement;
   size: ISize;
   imgNode?: HTMLImageElement; // 展示图片的内容
@@ -60,7 +68,13 @@ const zoomInfo = {
   ratio: 0.4,
 };
 
-class BasicToolOperation extends EventListener {
+const validNumber = (value: number) => {
+  return isNumber(value) && !isNaN(value);
+};
+
+export default class BasicToolOperation extends EventListener {
+  static NONE_ATTRIBUTE = 'noneAttribute';
+
   public container: HTMLElement; // 当前结构绑定 container
 
   public canvas!: HTMLCanvasElement;
@@ -118,7 +132,9 @@ class BasicToolOperation extends EventListener {
 
   public attributeLockList: string[]; // 属性限制列表
 
-  public allAttributes!:Attribute[];// 多工具所有标签集合
+  public allAttributes!: Attribute[]; // 多工具所有标签集合
+
+  public allAttributesMap!: Map<Attribute['value'], Attribute['key']>; // 多工具所有标签Map集合
 
   public dblClickListener: DblClickEventListener;
 
@@ -159,6 +175,13 @@ class BasicToolOperation extends EventListener {
 
   private _invalidDOM?: HTMLElement;
 
+  // 缓存图片的坐标和缩放比例
+  static Cache: Map<string, ICoordinate | number> = new Map();
+
+  private _coordinateCacheKey: string = '';
+
+  private _zoomCacheKey: string = '';
+
   private showDefaultCursor: boolean; // 是否展示默认的 cursor
 
   public coordUtils: CoordinateUtils;
@@ -182,6 +205,11 @@ class BasicToolOperation extends EventListener {
     // this.destroyCanvas();
     // this.createCanvas(props.size);
     this.imgNode = props.imgNode;
+    // 设置图片位置和zoom缓存key
+    if (props.imgNode && props.imgNode.src) {
+      this._coordinateCacheKey = `coordinate::${props.imgNode.src}`;
+      this._zoomCacheKey = `zoom::${props.imgNode.src}`;
+    }
     this.isImgError = !props.imgNode;
     this.basicImgInfo = {
       width: props.imgNode?.width ?? 0,
@@ -221,7 +249,7 @@ class BasicToolOperation extends EventListener {
     this._imgAttribute = props.imgAttribute ?? {};
     this.isHidden = false;
     this.dragStatus = EDragStatus.Wait;
-    this.defaultAttribute = props?.defaultAttribute ?? '无标签';
+    this.defaultAttribute = props?.defaultAttribute ?? BasicToolOperation.NONE_ATTRIBUTE;
     this.forbidCursorLine = !!props.forbidCursorLine;
     this.lang = ELang.Zh;
 
@@ -251,6 +279,10 @@ class BasicToolOperation extends EventListener {
     return this._ctx || this.canvas?.getContext('2d');
   }
 
+  get NoneAttribute() {
+    return BasicToolOperation.NONE_ATTRIBUTE;
+  }
+
   get basicCtx() {
     return this.basicCanvas?.getContext('2d');
   }
@@ -277,6 +309,18 @@ class BasicToolOperation extends EventListener {
     return [];
   }
 
+  hasAttributeInConfig(attribute: string) {
+    if (attribute === '') {
+      return false;
+    }
+
+    if (attribute === this.NoneAttribute) {
+      return true;
+    }
+
+    return this.config.attributeMap.has(attribute);
+  }
+
   /**
    * 设置此前工具标注结果信息
    */
@@ -287,8 +331,15 @@ class BasicToolOperation extends EventListener {
   /**
    * 多工具全量标签设置
    */
-  public setAllAttributes(allAttributes:Attribute[]){
+  public setAllAttributes(allAttributes: Attribute[]) {
     this.allAttributes = allAttributes;
+    this.allAttributesMap = new Map();
+
+    this.allAttributesMap.set(this.NoneAttribute, locale.getMessagesByLocale(EMessage.NoneAttribute, this.lang));
+
+    this.allAttributes.forEach((attribute) => {
+      this.allAttributesMap.set(attribute.value, attribute.key);
+    });
   }
 
   /**
@@ -359,6 +410,16 @@ class BasicToolOperation extends EventListener {
   public destroy() {
     this.destroyCanvas();
     this.eventUnbinding();
+    this.clearCache();
+  }
+
+  public clearCache() {
+    BasicToolOperation.Cache.clear();
+  }
+
+  public clearCachedCoordinateAndZoom() {
+    BasicToolOperation.Cache.delete(this._coordinateCacheKey);
+    BasicToolOperation.Cache.delete(this._zoomCacheKey);
   }
 
   public initCanvas(size: ISize) {
@@ -435,6 +496,13 @@ class BasicToolOperation extends EventListener {
 
   public setImgNode(imgNode: HTMLImageElement, basicImgInfo: Partial<{ valid: boolean; rotate: number }> = {}) {
     this.imgNode = imgNode;
+
+    // 图片更新后，更新缓存key
+    if (imgNode) {
+      this._coordinateCacheKey = `coordinate::${imgNode.src}`;
+      this._zoomCacheKey = `zoom::${imgNode.src}`;
+    }
+
     this.setBasicImgInfo({
       width: imgNode.width,
       height: imgNode.height,
@@ -451,7 +519,7 @@ class BasicToolOperation extends EventListener {
     if (typeof basicImgInfo.valid === 'boolean') {
       this.setValid(basicImgInfo.valid);
     }
-    this.initImgPos();
+    this.initImgPos({ useCachedPosition: false });
     // 多余渲染，影响性能
     // this.render();
     // this.renderBasicCanvas();
@@ -462,6 +530,9 @@ class BasicToolOperation extends EventListener {
     // 设置当前为错误图片
     this.isImgError = true;
     this.imgNode = undefined;
+
+    this._coordinateCacheKey = '';
+    this._zoomCacheKey = '';
 
     this.setBasicImgInfo({
       width: 0,
@@ -531,6 +602,24 @@ class BasicToolOperation extends EventListener {
     };
   }
 
+  public setDefaultAttribute(attribute: string) {
+    this.defaultAttribute = attribute;
+  }
+
+  /**
+   * Get the coordinate point in the original image coordinate system by mouse events
+   * @param e
+   * @returns
+   */
+  public getCoordinateInOrigin(e: MouseEvent) {
+    const bounding = this.canvas.getBoundingClientRect();
+
+    return {
+      x: (e.clientX - bounding.left - this.currentPos.x) / this.zoom,
+      y: (e.clientY - bounding.top - this.currentPos.y) / this.zoom,
+    };
+  }
+
   public getGetCenterCoordinate() {
     return {
       x: this.size.width / 2,
@@ -539,14 +628,15 @@ class BasicToolOperation extends EventListener {
   }
 
   /** 用于初始化图片的位置 */
-  public initImgPos = async () => {
-    // console.log('initImgPros');
+  public initImgPos = async (options?: { useCachedPosition?: boolean }) => {
     if (!this.imgNode || this.imgNode.width === 0) {
       return;
     }
+    // 初始化图片位置信息时，优先从持久化记录中获取
+    const { useCachedPosition } = options || { useCachedPosition: true };
     const zoomRatio = this._imgAttribute?.zoomRatio;
     const isOriginalSize = this._imgAttribute?.isOriginalSize;
-    const { currentPos, imgInfo, zoom } = ImgPosUtils.getInitImgPos(
+    const { currentPos, zoom } = ImgPosUtils.getInitImgPos(
       this.size,
       { width: this.imgNode.width, height: this.imgNode.height },
       this.rotate,
@@ -554,28 +644,36 @@ class BasicToolOperation extends EventListener {
       isOriginalSize,
     );
     // 初始化图片位置信息时，优先从持久化记录中获取
-    const statbleCoord = (await localforage.getItem('coordinate')) as ICoordinate;
-    this.setCurrentPos(statbleCoord || currentPos);
-    this.currentPosStorage = statbleCoord || currentPos;
-    let statblezoom = 0;
+    const cachedCoordinate = BasicToolOperation.Cache.get(this._coordinateCacheKey) as ICoordinate;
+    this.setCurrentPos(useCachedPosition ? cachedCoordinate || currentPos : currentPos);
+    this.currentPosStorage = useCachedPosition ? cachedCoordinate : currentPos;
+    let cachedZoom = 0;
     // 当部位原图比例显示时，采用stable zoom
     if (!isOriginalSize) {
       // 初始化图片缩放信息，优先从持久化记录中获取
-      statblezoom = (await localforage.getItem('zoom')) as number;
+      cachedZoom = BasicToolOperation.Cache.get(this._zoomCacheKey) as number;
     } else {
-      await localforage.setItem('zoom', 1, () => {});
+      BasicToolOperation.Cache.set(this._zoomCacheKey, 1);
     }
 
-    this.imgInfo = imgInfo;
-    this.setZoom(statblezoom || zoom);
+    const finalZoom = cachedZoom || zoom;
+    /**
+     * 修正https://project.feishu.cn/bigdata_03/issue/detail/3756207?parentUrl=%2Fbigdata_03%2FissueView%2FXARIG5p4g
+     * 因zoom可被缓存，在切换工具或切换图片列表时需要由缓存后的zoom重新计算imgInfo
+     **/
+    this.imgInfo = {
+      width: this.imgNode.width * finalZoom,
+      height: this.imgNode.height * finalZoom,
+    };
+    this.setZoom(finalZoom);
 
-    this.innerZoom = statblezoom || zoom;
+    this.innerZoom = finalZoom;
     this.renderReady = true;
     this.render();
     this.renderBasicCanvas();
 
     this.emit('dependRender');
-    this.emit('renderZoom', zoom);
+    this.emit('renderZoom', finalZoom);
   };
 
   /**
@@ -802,7 +900,11 @@ class BasicToolOperation extends EventListener {
       const time = new Date().getTime();
       const currentCoord = this.getCoordinate(e);
       // 拖拽时，更新持久化图片位置信息
-      localforage.setItem('coordinate', this.getCurrentPos(currentCoord), () => {});
+      const newCoordinate = this.getCurrentPos(currentCoord);
+
+      if (this._isValidCoordinate(newCoordinate)) {
+        BasicToolOperation.Cache.set(this._coordinateCacheKey, newCoordinate);
+      }
       /**
        * 图片拖拽判断
        * 1. 拖拽时间超过 1 秒则为拖拽
@@ -833,15 +935,15 @@ class BasicToolOperation extends EventListener {
   }
 
   // eslint-disable-next-line no-unused-vars
-  public onClick(e: MouseEvent) {}
+  public onClick(_e: MouseEvent) {}
 
   // eslint-disable-next-line no-unused-vars
-  public onLeftDblClick(e: MouseEvent) {
+  public onLeftDblClick(_e: MouseEvent) {
     // 左键双击
   }
 
   // eslint-disable-next-line no-unused-vars
-  public onRightDblClick(e: MouseEvent) {
+  public onRightDblClick(_e: MouseEvent) {
     // 右键双击
     this.clearImgDrag();
   }
@@ -860,9 +962,6 @@ class BasicToolOperation extends EventListener {
 
       // case EKeyCode.Z:
       //   if (e.ctrlKey) {
-      //     console.log(this)
-      //     console.log(this.prevResultList);
-      //     console.log(this.basicResult);
       //     debugger;
       //     if (e.shiftKey) {
       //       this.redo();
@@ -964,9 +1063,13 @@ class BasicToolOperation extends EventListener {
     const { currentPos: newCurrentPos, ratio, zoom, imgInfo } = pos;
 
     // 缩放时，更新持久化图片位置信息
-    localforage.setItem('coordinate', newCurrentPos, () => {});
+    if (this._isValidCoordinate(newCurrentPos)) {
+      BasicToolOperation.Cache.set(this._coordinateCacheKey, newCurrentPos);
+    }
     // 缩放时，更新持久化图片缩放信息
-    localforage.setItem('zoom', zoom, () => {});
+    if (validNumber(zoom)) {
+      BasicToolOperation.Cache.set(this._zoomCacheKey, zoom);
+    }
 
     this.innerZoom = zoom;
     this.setZoom(zoom);
@@ -1031,11 +1134,8 @@ class BasicToolOperation extends EventListener {
   public setImgAttribute(imgAttribute: IImageAttribute) {
     const oldImgAttribute = this._imgAttribute;
     this._imgAttribute = imgAttribute;
-    if (
-      oldImgAttribute?.zoomRatio !== imgAttribute.zoomRatio ||
-      oldImgAttribute.isOriginalSize !== imgAttribute.isOriginalSize
-    ) {
-      this.initImgPos();
+    if (oldImgAttribute?.zoomRatio !== imgAttribute.zoomRatio || imgAttribute.isOriginalSize) {
+      this.initImgPos({ useCachedPosition: false });
       return;
     }
     this.renderBasicCanvas();
@@ -1047,6 +1147,14 @@ class BasicToolOperation extends EventListener {
     if (sendMessage) {
       // send someting
     }
+  }
+
+  private _isValidCoordinate(coordinate: ICoordinate) {
+    if (!coordinate) {
+      return false;
+    }
+
+    return validNumber(coordinate.x) && validNumber(coordinate.y);
   }
 
   public setValid(valid: boolean) {
@@ -1113,7 +1221,7 @@ class BasicToolOperation extends EventListener {
     // 更改当前图片的旋转方式
     const rotate = MathUtils.getRotate(this.basicImgInfo.rotate);
     this.basicImgInfo.rotate = rotate;
-    this.initImgPos();
+    this.initImgPos({ useCachedPosition: false });
 
     // 触发外层 result 的更改
     this.emit('updateResult');
@@ -1122,7 +1230,7 @@ class BasicToolOperation extends EventListener {
   /** 获取当前属性颜色 */
   public getColor(attribute = '', config = this.config) {
     if (config?.attributeConfigurable === true && this.style.attributeColor) {
-      const attributeIndex = AttributeUtils.getAttributeIndex(attribute, this.allAttributes ?? []) +1;
+      const attributeIndex = AttributeUtils.getAttributeIndex(attribute, this.allAttributes ?? []) + 1;
       return this.style.attributeColor[attributeIndex];
     }
     const { color, toolColor } = this.style;
@@ -1134,7 +1242,7 @@ class BasicToolOperation extends EventListener {
 
   public getLineColor(attribute = '') {
     if (this.config?.attributeConfigurable === true) {
-      const attributeIndex = AttributeUtils.getAttributeIndex(attribute, this.allAttributes ?? []) +1;
+      const attributeIndex = AttributeUtils.getAttributeIndex(attribute, this.allAttributes ?? []) + 1;
       return this.style.attributeLineColor ? this.style.attributeLineColor[attributeIndex] : '';
     }
     const { color, lineColor } = this.style;
@@ -1142,6 +1250,44 @@ class BasicToolOperation extends EventListener {
       return lineColor[color];
     }
     return '';
+  }
+
+  /**
+   * Get the textIconSvg by attribute.
+   * @param attribute
+   */
+  public getTextIconSvg(attribute = '') {
+    return AttributeUtils.getTextIconSvg(
+      attribute,
+      this.config?.attributeList,
+      this.config.attributeConfigurable,
+      this.baseIcon,
+    );
+  }
+
+  /**
+   * 判定点是否在边界外
+   * @param coordinate
+   * @param currentPosition
+   * @returns boolean
+   */
+  public isPointOutOfBoundary(coordinate: ICoordinate, currentPosition: ICoordinate) {
+    const { zoom, basicResult, imgInfo } = this;
+
+    if (basicResult && zoom) {
+      // brX: basicResult.x
+      const { x: brX, y: brY, width: brW, height: brH } = basicResult;
+      const { x, y } = coordinate;
+      const { x: cX, y: cY } = currentPosition;
+
+      return x - cX > (brX + brW) * zoom || x - cX < brX * zoom || y - cY > (brY + brH) * zoom || y - cY < brY * zoom;
+    } else {
+      const { x, y } = coordinate;
+      const { x: cX, y: cY } = currentPosition;
+      const { width, height } = imgInfo!;
+
+      return x - cX > width || x - cX < 0 || y - cY > height || y - cY < 0;
+    }
   }
 
   public clearInvalidPage() {
@@ -1164,7 +1310,6 @@ class BasicToolOperation extends EventListener {
     // if (this.forbidBasicResultRender) {
     //   return;
     // }
-    // console.log(this.prevResultList);
     if (this.prevResultList && this.prevResultList?.length > 0) {
       for (let i = 0; i < this.prevResultList.length; i++) {
         const currentReulst = this.prevResultList[i];
@@ -1176,7 +1321,7 @@ class BasicToolOperation extends EventListener {
                   const toolColor = this.getColor(item.attribute);
                   const color = item.valid ? toolColor?.valid.stroke : toolColor?.invalid.stroke;
                   const transformRect = AxisUtils.changeRectByZoom(item, this.zoom, this.currentPos);
-                  let rectSize = `${Math.round(item.width)} * ${Math.round(item.height)}`;
+                  const rectSize = `${Math.round(item.width)} * ${Math.round(item.height)}`;
                   const textSizeWidth = rectSize.length * 7;
                   DrawUtils.drawRect(
                     this.canvas,
@@ -1187,6 +1332,7 @@ class BasicToolOperation extends EventListener {
                       order: item.order,
                       color,
                       thickness,
+                      allAttributesMap: this.allAttributesMap,
                     },
                   );
                   if (this.isShowAttributeText) {
@@ -1198,7 +1344,6 @@ class BasicToolOperation extends EventListener {
                       item.textAttribute,
                       {
                         color: color,
-                        // font: 'italic normal 900 14px Arial',
                         textMaxWidth: textWidth,
                         // ...DEFAULT_TEXT_SHADOW,
                       },
@@ -1228,7 +1373,7 @@ class BasicToolOperation extends EventListener {
                     thickness,
                   },
                 );
-                let showText = item.attribute;
+                let showText = this.allAttributesMap.get(item.attribute) || item.attribute;
                 if (this.isShowOrder) {
                   showText = `${item.order} ${showText}`;
                 }
@@ -1237,7 +1382,7 @@ class BasicToolOperation extends EventListener {
                   color: item.valid ? toolColor?.valid.stroke : toolColor?.invalid.stroke,
                   ...DEFAULT_TEXT_OFFSET,
                 });
-                if(this.isShowAttributeText){
+                if (this.isShowAttributeText) {
                   const endPoint = transformPointList[transformPointList.length - 1];
                   if (endPoint && endPoint.x) {
                     DrawUtils.drawText(
@@ -1251,8 +1396,6 @@ class BasicToolOperation extends EventListener {
                     );
                   }
                 }
-
-
               }
             });
             break;
@@ -1277,7 +1420,7 @@ class BasicToolOperation extends EventListener {
                     thickness,
                   },
                 );
-                let showText = item.attribute;
+                let showText = this.allAttributesMap.get(item.attribute) || item.attribute;
                 if (this.isShowOrder) {
                   showText = `${item.order} ${showText}`;
                 }
@@ -1285,14 +1428,20 @@ class BasicToolOperation extends EventListener {
                   color: item.valid ? toolColor?.valid.stroke : toolColor?.invalid.stroke,
                   ...DEFAULT_TEXT_OFFSET,
                 });
-                if(this.isShowAttributeText){
-                  let ctx = this.canvas.getContext("2d") as CanvasRenderingContext2D;
+                if (this.isShowAttributeText) {
+                  const ctx = this.canvas.getContext('2d') as CanvasRenderingContext2D;
                   ctx?.save();
                   // this.ctx.font = 'italic bold 14px SourceHanSansCN-Regular';
                   ctx.font = DEFAULT_FONT;
                   ctx.fillStyle = item.valid ? toolColor?.valid.stroke : toolColor?.invalid.stroke;
                   ctx.strokeStyle = item.valid ? toolColor?.valid.stroke : toolColor?.invalid.stroke;
-                  DrawUtils.wrapText(this.canvas, item.textAttribute, transformPointList[1].x - LINE_ORDER_OFFSET.x, transformPointList[1].y - LINE_ORDER_OFFSET.y, 200);
+                  DrawUtils.wrapText(
+                    this.canvas,
+                    item.textAttribute,
+                    transformPointList[1].x - LINE_ORDER_OFFSET.x,
+                    transformPointList[1].y - LINE_ORDER_OFFSET.y,
+                    200,
+                  );
                 }
               }
             });
@@ -1314,7 +1463,7 @@ class BasicToolOperation extends EventListener {
                     color: item.valid ? toolColor?.valid.stroke : toolColor?.invalid.stroke,
                     fill: 'transparent',
                   });
-                  let showText = item.attribute;
+                  let showText = this.allAttributesMap.get(item.attribute) || item.attribute;
                   if (this.isShowOrder) {
                     showText = `${item.order}  ${showText}`;
                   }
@@ -1329,18 +1478,17 @@ class BasicToolOperation extends EventListener {
                     },
                   );
 
-                  if(this.isShowAttributeText){
+                  if (this.isShowAttributeText) {
                     DrawUtils.drawText(
                       this.canvas,
                       { x: transformPoint.x + width, y: transformPoint.y + width + 24 },
                       item.textAttribute,
                       {
-                        color:item.valid ? toolColor?.valid.stroke : toolColor?.invalid.stroke,
+                        color: item.valid ? toolColor?.valid.stroke : toolColor?.invalid.stroke,
                         ...DEFAULT_TEXT_OFFSET,
                       },
                     );
                   }
-
                 }
               });
             }
@@ -1379,7 +1527,7 @@ class BasicToolOperation extends EventListener {
                   clear: both;
                 `,
               );
-              let preTagDom = document.getElementById('tagToolTag');
+              const preTagDom = document.getElementById('tagToolTag');
               if (!this.canvas?.parentNode?.contains(preTagDom)) {
                 this.canvas?.parentNode?.appendChild(dom);
               }
@@ -1387,9 +1535,7 @@ class BasicToolOperation extends EventListener {
             break;
           }
           default: {
-            console.log(currentReulst.toolName);
-            console.log(currentReulst);
-            //
+            // empty
           }
         }
       }
@@ -1458,8 +1604,6 @@ class BasicToolOperation extends EventListener {
     if (!this.canvas || !this.ctx || !this.imgNode || !this.renderReady) {
       return;
     }
-    // console.log(this.prevResultList);
-    // console.log('clearCn');
     this.clearCanvas();
     this.renderOtherAnnotation();
   }
@@ -1469,5 +1613,3 @@ class BasicToolOperation extends EventListener {
     this.emit('changeStyle', { attribute: newAttribute });
   }
 }
-
-export { IBasicToolOperationProps, BasicToolOperation };

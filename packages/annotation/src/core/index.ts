@@ -2,15 +2,22 @@
  * AnnotationEngine 标注引擎 - 各类标注工具管理
  */
 
-import { EToolName } from '@/constant/tool';
+import type { EToolName } from '@/constant/tool';
 import { getConfig, styleDefaultConfig } from '@/constant/defaultConfig';
 import CommonToolUtils from '@/utils/tool/CommonToolUtils';
-import { IPolygonData } from '@/types/tool/polygon';
+import type { IPolygonData } from '@/types/tool/polygon';
 import { ELang } from '@/constant/annotation';
-import { ToolConfig } from '@/interface/conbineTool';
+import type { Attribute, OneTag, PrevResult, ToolConfig } from '@/interface/combineTool';
+import type { ISize } from '@/types/tool/common';
+import type { IRect } from '@/types/tool/rectTool';
+import type { IRenderEnhance } from '@/types/tool/annotation';
+import { EMessage } from '@/locales/constants';
+
+import locale from '../locales';
+import BasicToolOperation from './toolOperation/basicToolOperation';
 
 export interface IProps {
-  isShowOrder:boolean;
+  isShowOrder: boolean;
   container: HTMLElement;
   size: ISize;
   toolName: EToolName;
@@ -19,6 +26,7 @@ export interface IProps {
   style?: any;
   tagConfigList: OneTag[];
   attributeList: Attribute[];
+  allAttributesList: Attribute[];
 }
 
 const loadImage = (imgSrc: string) => {
@@ -47,7 +55,7 @@ export default class AnnotationEngine {
 
   private size: ISize;
 
-  private isShowOrder :boolean;
+  private isShowOrder: boolean;
 
   private config: ToolConfig; // 定义 TODO！！
 
@@ -59,19 +67,23 @@ export default class AnnotationEngine {
 
   private imgNode?: HTMLImageElement;
 
+  private allAttributesList: Attribute[];
+
   // 工具内依赖的记录
   private basicResult?: IRect | IPolygonData; // 用于存储当前的标注结果的依赖物体结果状态
 
   private dependToolName?: EToolName;
 
-  constructor(props: IProps) { 
+  constructor(props: IProps) {
     this.isShowOrder = props.isShowOrder;
     this.tagConfigList = props.tagConfigList;
     this.attributeList = props.attributeList;
+    this.allAttributesList = props.allAttributesList;
     this.container = props.container;
     this.size = props.size;
     this.toolName = props.toolName;
     this.imgNode = props.imgNode;
+    this.i18nLanguage = 'cn'; // 默认为中文（跟 basicOperation 内同步）
     const tmpObjectConfig = props.config ?? getConfig(props.toolName); // 默认配置
     let attributeArr: any[] = [...props.attributeList];
     if (
@@ -86,13 +98,24 @@ export default class AnnotationEngine {
       // @ts-ignore
       attributeArr = [...attributeArr, ...props.config?.attributeList];
     }
+
+    const attributeMap = new Map();
+    attributeMap.set(
+      BasicToolOperation.NONE_ATTRIBUTE,
+      locale.getMessagesByLocale(EMessage.NoneAttribute, this.i18nLanguage),
+    );
+
+    for (const attribute of attributeArr) {
+      attributeMap.set(attribute.value, attribute.key);
+    }
+
     this.config = {
       ...tmpObjectConfig,
       attributeList: attributeArr,
+      attributeMap,
       tagConfigList: props.tagConfigList,
     } as unknown as ToolConfig;
     this.style = props.style ?? styleDefaultConfig; // 设置默认操作
-    this.i18nLanguage = 'cn'; // 默认为中文（跟 basicOperation 内同步）
     this._initToolOperation();
   }
 
@@ -155,6 +178,7 @@ export default class AnnotationEngine {
     if (this.toolInstance) {
       this.toolInstance.destroy();
     }
+
     const ToolOperation: any = CommonToolUtils.getCurrentOperation(this.toolName);
     if (!ToolOperation) {
       return;
@@ -173,13 +197,17 @@ export default class AnnotationEngine {
     if (this.imgNode) {
       Object.assign(defaultData, { imgNode: this.imgNode });
     }
-    this.toolInstance = new ToolOperation( defaultData);
+    this.toolInstance = new ToolOperation(defaultData);
 
     // 实时同步语言
     this.setLang(this.i18nLanguage);
     this.toolInstance.init();
     // 设置是否显示顺序
     this.toolInstance.setIsShowOrder(this.isShowOrder);
+    // 设置统一标签
+    if (this.allAttributesList) {
+      this.toolInstance?.setAllAttributes(this.allAttributesList);
+    }
   }
 
   /**

@@ -2,25 +2,29 @@
  * 查看模式 - 严格配置要求
  */
 
-import { cloneDeep } from 'lodash';
+import { cloneDeep } from 'lodash-es';
+
 import CommonToolUtils from '@/utils/tool/CommonToolUtils';
 import RectUtils from '@/utils/tool/RectUtils';
 import TagUtils from '@/utils/tool/TagUtils';
+import type { ITagResult } from '@/types/tool/tagTool';
+import type { IRect } from '@/types/tool/rectTool';
+
 import { DEFAULT_TEXT_OFFSET } from '../../constant/annotation';
 import { EToolName } from '../../constant/tool';
-import { IPolygonData } from '../../types/tool/polygon';
-import AttributeUtils from '../../utils/tool/AttributeUtils';
+import type { IPolygonData } from '../../types/tool/polygon';
 import AxisUtils from '../../utils/tool/AxisUtils';
 import DrawUtils from '../../utils/tool/DrawUtils';
 import StyleUtils from '../../utils/tool/StyleUtils';
-import { BasicToolOperation, IBasicToolOperationProps } from './basicToolOperation';
+import type { IBasicToolOperationProps } from './basicToolOperation';
+import BasicToolOperation from './basicToolOperation';
 
 const TEXT_ATTRIBUTE_OFFSET = {
   x: 8,
   y: 26,
 };
 interface ICheckResult {
-  result: Array<IPolygonData | IRect | ITagResult>;
+  result: (IPolygonData | IRect | ITagResult)[];
   toolName: EToolName;
   config: string[];
 }
@@ -31,7 +35,7 @@ interface ICheckOperationProps extends IBasicToolOperationProps {
 
 const newScope = 2;
 
-class CheckOperation extends BasicToolOperation {
+export default class CheckOperation extends BasicToolOperation {
   public resultList: ICheckResult[];
 
   public hoverID: string[];
@@ -61,9 +65,9 @@ class CheckOperation extends BasicToolOperation {
     }
 
     const newMouseSelectedID = this.mouseHoverID;
-    const currentShowList = (this.resultList.find((v) => v.toolName === EToolName.Rect)?.result ?? []) as Array<
-      IRect & { isSelected: boolean }
-    >;
+    const currentShowList = (this.resultList.find((v) => v.toolName === EToolName.Rect)?.result ?? []) as (IRect & {
+      isSelected: boolean;
+    })[];
 
     if (e.button === 0) {
       let selectedID = [newMouseSelectedID];
@@ -176,7 +180,7 @@ class CheckOperation extends BasicToolOperation {
           },
         );
       }
-      let showText = `${AttributeUtils.getAttributeShowText(polygon.attribute, config?.attributeList ?? []) ?? ''}`;
+      let showText = `${this.config.attributeMap.get(polygon.attribute) || polygon.attribute}`;
       if (config?.isShowOrder && polygon?.order > 0) {
         showText = `${polygon.order} ${showText}`;
       }
@@ -272,5 +276,3 @@ class CheckOperation extends BasicToolOperation {
     return [[], {}];
   }
 }
-
-export default CheckOperation;

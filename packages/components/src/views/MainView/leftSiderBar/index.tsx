@@ -1,14 +1,16 @@
-import React from 'react';
+import classnames from 'classnames';
+import React, { useLayoutEffect, useRef, useState } from 'react';
+import { connect, useDispatch } from 'react-redux';
+
 import CollapseIcon from '@/assets/cssIcon/collapse.svg';
 import SpreadIcon from '@/assets/cssIcon/spread.svg';
-import classnames from 'classnames';
-import { PageJump } from '../../../store/annotation/actionCreators';
-import { updateCollapseStatus } from '../../../store/toolStyle/actionCreators';
-import { connect, useDispatch } from 'react-redux';
+import { PageJump } from '@/store/annotation/actionCreators';
+
+// import { updateCollapseStatus } from '../../../store/toolStyle/actionCreators';
+
 import { prefix } from '../../../constant';
-import { IFileItem } from '../../../types/data';
-import { AppState } from '../../../store';
-import localforage from 'localforage';
+import type { AppState } from '../../../store';
+import type { IFileItem } from '../../../types/data';
 const layoutCls = `${prefix}-layout`;
 
 interface LeftSiderProps {
@@ -17,37 +19,47 @@ interface LeftSiderProps {
   imgList: IFileItem[];
   currentToolName: string;
   imgIndex: string;
-  imgListCollapse: boolean;
   leftSiderContent?: React.ReactNode | React.ReactNode;
+  style?: React.CSSProperties;
 }
 
 const LeftSider: React.FC<LeftSiderProps> = (props) => {
-  const { imgList, imgIndex, imgListCollapse, leftSiderContent } = props;
+  const { imgList, imgIndex, leftSiderContent, style = {} } = props;
+
+  const [imgListCollapse, setImgListCollapse] = useState<boolean>(false);
+  const sliderBoxRef = useRef<HTMLDivElement | null>(null);
   const dispatch = useDispatch();
   const pageJump = (page: number) => {
     dispatch(PageJump(page));
   };
+
+  // 将左侧属性栏高度设置为剩余高度
+  useLayoutEffect(() => {
+    if (!sliderBoxRef.current) {
+      return;
+    }
+
+    const rect = sliderBoxRef.current.getBoundingClientRect();
+    const attributeWrapperHeight = window.innerHeight - rect.top;
+    sliderBoxRef.current.style.height = `${attributeWrapperHeight}px`;
+  }, []);
 
   if (imgList.length === 1 && !leftSiderContent) {
     return <div />;
   }
 
   return (
-    <div className='sliderBox' id='sliderBoxId'>
-      <div
-        className={imgListCollapse ? `${layoutCls}__left_sider_hide` : `${layoutCls}__left_sider`}
-      >
+    <div className="sliderBox" id="sliderBoxId" style={style} ref={sliderBoxRef}>
+      <div className={imgListCollapse ? `${layoutCls}__left_sider_hide` : `${layoutCls}__left_sider`}>
         {leftSiderContent
           ? leftSiderContent
           : imgList.map((item, index) => {
               return (
-                <div key={item.id} className='item'>
+                <div key={item.id} className="item">
                   <div
                     className={classnames({ imgItem: true, chooseImg: index === Number(imgIndex) })}
                     onClick={async (e) => {
                       e.stopPropagation();
-                      await localforage.removeItem('zoom');
-                      await localforage.removeItem('coordinate');
                       pageJump(index);
                     }}
                   >
@@ -72,10 +84,10 @@ const LeftSider: React.FC<LeftSiderProps> = (props) => {
       </div>
 
       <img
-        className='itemOpIcon'
+        className="itemOpIcon"
         src={imgListCollapse ? SpreadIcon : CollapseIcon}
         onClick={(e) => {
-          dispatch(updateCollapseStatus(!imgListCollapse));
+          setImgListCollapse(!imgListCollapse);
           e.stopPropagation();
         }}
       />
@@ -83,13 +95,11 @@ const LeftSider: React.FC<LeftSiderProps> = (props) => {
   );
 };
 
-const mapStateToProps = ({ annotation, toolStyle }: AppState) => {
+const mapStateToProps = ({ annotation }: AppState) => {
   const { imgList, imgIndex } = annotation;
-  const { imgListCollapse } = toolStyle;
   return {
     imgList,
     imgIndex,
-    imgListCollapse,
   };
 };
 

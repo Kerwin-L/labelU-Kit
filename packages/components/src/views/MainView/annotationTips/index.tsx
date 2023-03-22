@@ -5,8 +5,8 @@
  * @LastEditors: Laoluo luozefeng@sensetime.com
  * @LastEditTime: 2022-05-12 19:34:32
  */
-import React from 'react';
 import { Tooltip } from 'antd';
+
 import { prefix } from '@/constant';
 
 interface IProps {
@@ -20,9 +20,9 @@ const AnnotationTips = ({ tips }: IProps) => {
 
   return (
     <div className={`${prefix}-tips`}>
-      <div className=''>
-        <Tooltip placement='bottomRight' title={tips}>
-          <span className=''>{tips}</span>
+      <div className="">
+        <Tooltip placement="bottomRight" title={tips}>
+          <span className="">{tips}</span>
         </Tooltip>
       </div>
     </div>

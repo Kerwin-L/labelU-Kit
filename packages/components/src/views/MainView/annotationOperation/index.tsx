@@ -1,17 +1,18 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { message } from 'antd/es';
-import { AppState } from 'src/store';
-import { connect, useDispatch } from 'react-redux';
-import { ImgAttributeState } from 'src/store/imgAttribute/types';
-import _ from 'lodash';
-import { store } from '@/index';
-
-import useSize from '@/hooks/useSize';
-import { InitToolStyleConfig } from '@/store/toolStyle/actionCreators';
-import { AnnotationEngine, ImgUtils } from '@label-u/annotation';
-import FileError from '@/components/fileException/FileError';
+import type { AnnotationEngine } from '@label-u/annotation';
+import { ImgUtils } from '@label-u/annotation';
 import { i18n } from '@label-u/utils';
-import { AppProps } from '@/App';
+import { message } from 'antd/es';
+import _ from 'lodash-es';
+import React, { useEffect, useRef, useState } from 'react';
+import { connect, useDispatch } from 'react-redux';
+import type { AppState } from 'src/store';
+import type { ImgAttributeState } from 'src/store/imgAttribute/types';
+
+import type { AppProps } from '@/App';
+import FileError from '@/components/fileException/FileError';
+import useSize from '@/hooks/useSize';
+import { store } from '@/index';
+import { InitToolStyleConfig } from '@/store/toolStyle/actionCreators';
 import { ChangeSave } from '@/store/annotation/actionCreators';
 
 interface IProps extends AppState, AppProps {
@@ -23,6 +24,7 @@ interface IProps extends AppState, AppProps {
 }
 
 const AnnotationOperation: React.FC<IProps> = (props: IProps) => {
+  const initializeTime = useRef(Date.now());
   const [, forceRender] = useState<number>(0);
   const dispatch = useDispatch();
   const {
@@ -68,28 +70,38 @@ const AnnotationOperation: React.FC<IProps> = (props: IProps) => {
   }, [annotationEngine, dataInjectionAtCreation, renderEnhance]);
 
   useEffect(() => {
-    if (toolInstance) {
-      toolInstance.singleOn('messageError', (error: string) => {
-        message.error(error);
-      });
-
-      toolInstance.singleOn('messageInfo', (info: string) => {
-        message.info(info);
-      });
-
-      toolInstance.singleOn('changeAnnotationShow', () => {
-        forceRender((s) => s + 1);
-      });
-
-      // toolInstance.setForbidOperation(true)
+    if (!toolInstance) {
+      return;
     }
+
+    const handleMessageError = (error: string) => {
+      message.error(error);
+    };
+
+    const handleMessageInfo = (info: string) => {
+      message.info(info);
+    };
+
+    const handleToggleAnnotationVisibility = () => {
+      forceRender((s) => s + 1);
+    };
+
+    toolInstance.singleOn('messageError', handleMessageError);
+    toolInstance.singleOn('messageInfo', handleMessageInfo);
+    toolInstance.singleOn('changeAnnotationShow', handleToggleAnnotationVisibility);
+
+    return () => {
+      toolInstance?.unbind('messageError', handleMessageError);
+      toolInstance?.unbind('messageInfo', handleMessageInfo);
+      toolInstance?.unbind('changeAnnotationShow', handleToggleAnnotationVisibility);
+    };
   }, [toolInstance]);
 
   useEffect(() => {
     if (toolInstance) {
       toolInstance.setImgAttribute(imgAttribute);
     }
-  }, [imgAttribute]);
+  }, [imgAttribute, toolInstance]);
 
   /** 样式同步 */
   useEffect(() => {
@@ -99,7 +111,7 @@ const AnnotationOperation: React.FC<IProps> = (props: IProps) => {
     if (annotationEngine) {
       annotationEngine.setStyle(toolStyle);
     }
-  }, [toolStyle]);
+  }, [annotationEngine, toolInstance, toolStyle]);
 
   /** 窗口大小监听 */
   useEffect(() => {
@@ -110,7 +122,7 @@ const AnnotationOperation: React.FC<IProps> = (props: IProps) => {
     if (annotationEngine) {
       annotationEngine.setSize(size);
     }
-  }, [size]);
+  }, [annotationEngine, size, toolInstance]);
 
   /**
    * 重新加载图片，避免网络问题导致的图片无法加载
@@ -132,12 +144,15 @@ const AnnotationOperation: React.FC<IProps> = (props: IProps) => {
     // 初始化配置防抖方法
     const throttle = (fun: () => void, time: number) => {
       let timmer: any;
-      let returnFunction = () => {
+      const returnFunction = () => {
         if (timmer) {
           clearTimeout(timmer);
         }
         timmer = setTimeout(() => {
-          fun();
+          // TODO: 引擎优化后删除以下代码
+          if (initializeTime.current > 0 && Date.now() - initializeTime.current > 2000) {
+            fun();
+          }
         }, time);
       };
       return returnFunction;
@@ -148,22 +163,22 @@ const AnnotationOperation: React.FC<IProps> = (props: IProps) => {
     const throtthleSave = window.Cthrottle(() => {
       // 切换工具保存标注结果
       dispatch(ChangeSave);
+      // TODO：以上代码不必要
     }, 100);
-    document.getElementById('toolContainer')?.addEventListener('saveLabelResultToImg', (e) => {
-      throtthleSave();
-    });
-  }, []);
+
+    document.getElementById('toolContainer')?.addEventListener('saveLabelResultToImg', throtthleSave);
+
+    return () => {
+      initializeTime.current = 0;
+      document.getElementById('toolContainer')?.removeEventListener('saveLabelResultToImg', throtthleSave);
+    };
+  }, [dispatch]);
 
   return (
-    <div ref={annotationRef} className='annotationOperation'>
-      <div className='canvas' ref={containerRef} style={size} id='toolContainer' key={toolName} />
+    <div ref={annotationRef} className="annotationOperation">
+      <div className="canvas" ref={containerRef} style={size} id="toolContainer" key={toolName} />
       {toolInstance?.isImgError === true && (
-        <FileError
-          {...size}
-          reloadImage={reloadImg}
-          backgroundColor='#e2e2e2'
-          ignoreOffsetY={true}
-        />
+        <FileError {...size} reloadImage={reloadImg} backgroundColor="#e2e2e2" ignoreOffsetY={true} />
       )}
     </div>
   );
@@ -171,15 +186,7 @@ const AnnotationOperation: React.FC<IProps> = (props: IProps) => {
 
 const mapStateToProps = (state: AppState) => {
   const annotationState = _.pickBy(state.annotation, (v, k) =>
-    [
-      'imgList',
-      'imgIndex',
-      'stepList',
-      'step',
-      'toolInstance',
-      'annotationEngine',
-      'loading',
-    ].includes(k),
+    ['imgList', 'imgIndex', 'stepList', 'step', 'toolInstance', 'annotationEngine', 'loading'].includes(k),
   );
   return {
     imgAttribute: state.imgAttribute,

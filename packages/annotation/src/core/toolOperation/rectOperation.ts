@@ -1,6 +1,9 @@
 import AxisUtils from '@/utils/tool/AxisUtils';
 import RectUtils from '@/utils/tool/RectUtils';
 import MathUtils from '@/utils/MathUtils';
+import type { IRect, IRectConfig } from '@/types/tool/rectTool';
+import type { ICoordinate } from '@/types/tool/common';
+
 import { EDragStatus, ESortDirection } from '../../constant/annotation';
 import EKeyCode from '../../constant/keyCode';
 import { EDragTarget } from '../../constant/tool';
@@ -13,17 +16,18 @@ import DrawUtils from '../../utils/tool/DrawUtils';
 import MarkerUtils from '../../utils/tool/MarkerUtils';
 import { getPolygonPointUnderZoom } from '../../utils/tool/polygonTool';
 import uuid from '../../utils/uuid';
-import { BasicToolOperation, IBasicToolOperationProps } from './basicToolOperation';
+import type { IBasicToolOperationProps } from './basicToolOperation';
+import BasicToolOperation from './basicToolOperation';
 import TextAttributeClass from './textAttributeClass';
 
-interface IRectOperationProps extends IBasicToolOperationProps {
+export interface IRectOperationProps extends IBasicToolOperationProps {
   drawOutSideTarget: boolean; // 是否可以在边界外进行标注
   style: any;
 }
 
 const scope = 6;
 
-class RectOperation extends BasicToolOperation {
+export default class RectOperation extends BasicToolOperation {
   public drawingRect?: IRect;
 
   public firstClickCoord?: ICoordinate; // 第一次点击的位置
@@ -922,12 +926,12 @@ class RectOperation extends BasicToolOperation {
     }
 
     // 标注序号添加
-    Object.assign(this.drawingRect, {
+    Object.assign(this.drawingRect!, {
       order:
         // CommonToolUtils.getMaxOrder(
         //   this.rectList.filter((v) => CommonToolUtils.isSameSourceID(v.sourceID, basicSourceID)),
         // ) + 1,
-        CommonToolUtils.getAllToolsMaxOrder( this.rectList,this.prevResultList) +1
+        CommonToolUtils.getAllToolsMaxOrder(this.rectList, this.prevResultList) + 1,
     });
 
     this.firstClickCoord = {
@@ -944,7 +948,7 @@ class RectOperation extends BasicToolOperation {
     if (this.dataInjectionAtCreation) {
       const data = this.dataInjectionAtCreation(this.drawingRect);
       if (data) {
-        Object.assign(this.drawingRect, data);
+        Object.assign(this.drawingRect!, data);
       }
     }
   }
@@ -1061,6 +1065,7 @@ class RectOperation extends BasicToolOperation {
     }
 
     this.render();
+    this.container.dispatchEvent(this.saveDataEvent);
   }
 
   public shiftRightMouseUp(e: MouseEvent) {
@@ -1101,6 +1106,7 @@ class RectOperation extends BasicToolOperation {
     if (this.drawingRect) {
       // 结束框的绘制
       this.addDrawingRectToRectList();
+      this.container.dispatchEvent(this.saveDataEvent);
       return;
     }
 
@@ -1113,6 +1119,7 @@ class RectOperation extends BasicToolOperation {
     // 创建框
     this.createNewDrawingRect(e, basicSourceID);
     this.render();
+    this.container.dispatchEvent(this.saveDataEvent);
 
     return undefined;
   }
@@ -1429,12 +1436,12 @@ class RectOperation extends BasicToolOperation {
 
       if (rect.label && this.hasMarkerConfig) {
         // const order = CommonToolUtils.getCurrentMarkerIndex(rect.label, this.config.markerList) + 1;
-        const order = CommonToolUtils.getAllToolsMaxOrder(this.rectList,this.prevResultList)
+        const order = CommonToolUtils.getAllToolsMaxOrder(this.rectList, this.prevResultList);
         showText = `${order}_${MarkerUtils.getMarkerShowText(rect.label, this.config.markerList)}`;
       }
 
       if (rect.attribute) {
-        showText = `${showText}  ${AttributeUtils.getAttributeShowText(rect.attribute, this.config?.attributeList)}`;
+        showText = `${showText}  ${this.config.attributeMap.get(rect.attribute) || rect.attribute}`;
       }
 
       const transformRect = AxisUtils.changeRectByZoom(rect, isZoom ? zoom : this.zoom, this.currentPos);
@@ -1479,8 +1486,8 @@ class RectOperation extends BasicToolOperation {
       //     },
       //   );
       // }
-      // 文本的输入 
-      if (!hiddenText && rect.textAttribute && rect.id !== this.selectedRectID &&this.isShowAttributeText) {
+      // 文本的输入
+      if (!hiddenText && rect.textAttribute && rect.id !== this.selectedRectID && this.isShowAttributeText) {
         const marginTop = 0;
         const textWidth = Math.max(20, transformRect.width - textSizeWidth);
         DrawUtils.drawText(
@@ -1570,7 +1577,6 @@ class RectOperation extends BasicToolOperation {
    * 渲染矩形框体
    */
   public renderRect() {
-    this.container.dispatchEvent(this.saveDataEvent);
     this.renderStaticRect();
     this.renderCreatingRect();
   }
@@ -1586,6 +1592,11 @@ class RectOperation extends BasicToolOperation {
 
   public setDefaultAttribute(defaultAttribute?: string) {
     const oldDefault = this.defaultAttribute;
+
+    if (!this.hasAttributeInConfig(defaultAttribute!)) {
+      return;
+    }
+
     this.defaultAttribute = defaultAttribute ?? '';
 
     if (oldDefault !== defaultAttribute) {
@@ -1594,6 +1605,7 @@ class RectOperation extends BasicToolOperation {
 
       //  触发侧边栏同步
       this.emit('changeAttributeSidebar');
+      this.container.dispatchEvent(this.saveDataEvent);
 
       // 如有选中目标，则需更改当前选中的属性
       const { selectedRect } = this;
@@ -1719,7 +1731,3 @@ class RectOperation extends BasicToolOperation {
     }
   }
 }
-
-export { RectOperation, IRectOperationProps };
-
-export default RectOperation;

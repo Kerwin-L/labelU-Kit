@@ -1,21 +1,17 @@
-import { RectOperation } from './core/toolOperation/rectOperation';
+import RectOperation from './core/toolOperation/rectOperation';
 import TagOperation from './core/toolOperation/tagOperation';
 import PointOperation from './core/toolOperation/pointOperation';
 import LineToolOperation from './core/toolOperation/LineToolOperation';
 import TextToolOperation from './core/toolOperation/TextToolOperation';
 import PolygonOperation from './core/toolOperation/polygonOperation';
 import MeasureOperation from './core/toolOperation/measureOperation';
-import { BasicToolOperation } from './core/toolOperation/basicToolOperation';
+import BasicToolOperation from './core/toolOperation/basicToolOperation';
 import ViewOperation from './core/toolOperation/ViewOperation';
-
-// Constant
 import * as cAnnotation from './constant/annotation';
 import * as cAnnotationTask from './constant/annotationTask';
 import * as cKeyCode from './constant/keyCode';
 import * as cStyle from './constant/style';
 import * as cTool from './constant/tool';
-
-// Utils
 import TagUtils from './utils/tool/TagUtils';
 import uuid from './utils/uuid';
 import CommonToolUtils from './utils/tool/CommonToolUtils';
@@ -26,24 +22,17 @@ import AxisUtils from './utils/tool/AxisUtils';
 import DrawUtils from './utils/tool/DrawUtils';
 import ImgUtils from './utils/ImgUtils';
 import MathUtils from './utils/MathUtils';
-
-// ToolListener
 import DblClickEventListener from './utils/tool/DblClickEventListener'; // 暂时这样支持外部工具的使用
-
 import AnnotationEngine from './core/index';
-
 export { EToolName, TOOL_NAME } from './constant/tool';
-
 export { COLORS_ARRAY } from './constant/style';
-
 import EKeyCode from './constant/keyCode';
-
 import AttributeUtils from './utils/tool/AttributeUtils';
 
 const toolUtils = CommonToolUtils;
 
 // 工具对外暴露配置统一定义
-export * from './interface/conbineTool';
+export * from './interface/combineTool';
 
 export {
   // 各类图形操作
@@ -77,5 +66,5 @@ export {
   MathUtils,
   AnnotationEngine,
   // constants
-  EKeyCode
+  EKeyCode,
 };

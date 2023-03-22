@@ -1,7 +1,7 @@
 // 编辑步骤的侧边栏宽度
 export const editStepWidth = 320;
 
-export type toolNameType =
+export type ToolNameType =
   | `rectTool`
   | `tagTool`
   | `polygonTool`
@@ -63,6 +63,8 @@ export enum EToolName {
   ClientAttribute = 'clientAttributeTool',
   /** OCR关联关系工具 */
   OCRRelation = 'OCRRelationTool',
+  /** box3d  */
+  Cuboid = 'cuboidTool',
 }
 
 export enum ECheckModel {
@@ -77,7 +79,7 @@ export enum ERectPattern {
 
 export type ToolName = EToolName | EVideoToolName | EPointCloudName;
 
-export const TOOL_NAME: { [a: string]: string } = {
+export const TOOL_NAME: Record<string, string> = {
   [EToolName.Rect]: '拉框',
   [EToolName.Tag]: '标签分类',
   [EToolName.Point]: '标点',
@@ -87,6 +89,7 @@ export const TOOL_NAME: { [a: string]: string } = {
   [EToolName.Text]: '文本描述',
   [EToolName.Polygon]: '多边形',
   [EToolName.Line]: '标线',
+  [EToolName.Cuboid]: '立体框',
   [EToolName.LineMarker]: '列表线条',
   [EToolName.FolderTag]: '文件夹标签',
   [EToolName.RectTrack]: '拉框跟踪',
@@ -210,20 +213,6 @@ export enum EThumbnailOption {
   TrackPrediction,
   ImgSearch,
 }
-
-export const CLIENT_TOOL_HEAD_TYPE: { [a: string]: string } = {
-  [EPointCloudName.PointCloud]: 'sensebeepc',
-  [EToolName.ClientAttribute]: 'sensebeepc-EnumAttributeTool',
-  [EToolName.Face]: 'sensebeepc-FacePointsLabellingTool',
-  [EToolName.OCRRelation]: 'sensebeepc-OCRRelationTool',
-};
-
-export const CLIENT_TOOL_NAME: { [a: string]: string } = {
-  [EPointCloudName.PointCloud]: '点云客户端',
-  [EToolName.ClientAttribute]: '客户端属性工具',
-  [EToolName.Face]: '人脸106点工具',
-  [EToolName.OCRRelation]: 'OCR关联关系工具',
-};
 
 /** 曲线分割点数 */
 export const SEGMENT_NUMBER = 16;

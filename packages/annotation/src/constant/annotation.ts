@@ -35,6 +35,7 @@ export enum EDragTarget {
   Point,
   Line,
   Plane,
+  Cuboid,
 }
 
 /** 顺序 */
@@ -61,6 +62,56 @@ export enum ERotateDirection {
   Clockwise, // 顺时针
   Anticlockwise, // 逆时针
 }
+
+export enum ECuboidPlain {
+  Front = 'front',
+  Back = 'back',
+  Side = 'side',
+}
+
+export enum ECuboidPosition {
+  TL = 'tl',
+  TR = 'tr',
+  BL = 'bl',
+  BR = 'br',
+}
+
+export enum ECuboidDirection {
+  Front = 'front',
+  Back = 'back',
+  Left = 'left',
+  Right = 'right',
+  Top = 'top',
+}
+
+export const DIAGONAL_POINT = {
+  tl: 'br',
+  tr: 'bl',
+  br: 'tl',
+  bl: 'tr',
+};
+
+export enum ECuboidLineDirection {
+  Row = 'row',
+  Column = 'column',
+}
+
+/**
+ * Get the Position by the point and direction(Row or Column).
+ */
+export const CUBOID_ROW = {
+  [ECuboidPosition.TL]: ECuboidPosition.TR,
+  [ECuboidPosition.TR]: ECuboidPosition.TL,
+  [ECuboidPosition.BL]: ECuboidPosition.BR,
+  [ECuboidPosition.BR]: ECuboidPosition.BL,
+};
+
+export const CUBOID_COLUMN = {
+  [ECuboidPosition.TL]: ECuboidPosition.BL,
+  [ECuboidPosition.TR]: ECuboidPosition.BR,
+  [ECuboidPosition.BL]: ECuboidPosition.TL,
+  [ECuboidPosition.BR]: ECuboidPosition.TR,
+};
 
 /**
  * 默认多边形文本偏移量

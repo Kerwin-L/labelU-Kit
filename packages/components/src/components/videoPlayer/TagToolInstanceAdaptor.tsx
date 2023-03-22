@@ -1,15 +1,17 @@
-
 import React from 'react';
-import { CommonToolUtils, tagToolConfig, uuid } from '@label-u/annotation';
+import type { TagToolConfig } from '@label-u/annotation';
+import { CommonToolUtils, uuid } from '@label-u/annotation';
+import pickBy from 'lodash-es/pickBy';
+
 import StepUtils from '@/utils/StepUtils';
 import { jsonParser } from '@/utils';
+import type { IStepInfo } from '@/types/step';
+import type { IFileItem } from '@/types/data';
+
 import { VideoPlayer } from './index';
 import { VideoTagLayer } from './VideoTagLayer';
-import { IStepInfo } from '@/types/step';
-import _ from 'lodash';
 import type { ObjectString } from './types';
 import { getKeyCodeNumber } from './utils';
-import { IFileItem } from '@/types/data';
 
 export interface IVideoTagInstanceAdaptorProps {
   imgIndex: number;
@@ -34,7 +36,7 @@ export class TagToolInstanceAdaptor extends React.Component<
   IVideoTagInstanceAdaptorProps,
   IVideoTagInstanceAdaptorState
 > {
-  public fns: { [key: string]: () => void } = {};
+  public fns: Record<string, () => void> = {};
   public videoRef?: HTMLVideoElement;
   public labelSelectedList: number[] = [];
 
@@ -66,7 +68,7 @@ export class TagToolInstanceAdaptor extends React.Component<
     return this.state.valid;
   }
 
-  public clearResult = (sendMsg = true, value?: string) => {
+  public clearResult = (sendMsg: boolean, value?: string) => {
     const newTag = value
       ? this.state.tagResult.map((v) => {
           if (v?.result[value]) {
@@ -91,10 +93,7 @@ export class TagToolInstanceAdaptor extends React.Component<
     const videoWidth = this.videoRef?.videoWidth ?? 0;
     const videoHeight = this.videoRef?.videoHeight ?? 0;
 
-    return [
-      this.state.tagResult,
-      { valid: this.state.valid, duration, frames, videoWidth, videoHeight },
-    ];
+    return [this.state.tagResult, { valid: this.state.valid, duration, frames, videoWidth, videoHeight }];
   };
 
   public singleOn(event: string, func: () => void) {
@@ -107,7 +106,7 @@ export class TagToolInstanceAdaptor extends React.Component<
 
   public getTagResultByCode(num1: number, num2?: number) {
     try {
-      const inputList = (this.config as tagToolConfig)?.inputList ?? [];
+      const inputList = (this.config as TagToolConfig)?.inputList ?? [];
       const mulitTags = inputList.length > 1;
       const keycode1 = num2 !== undefined ? num1 : 0;
       const keycode2 = num2 !== undefined ? num2 : num1;
@@ -166,7 +165,7 @@ export class TagToolInstanceAdaptor extends React.Component<
   public combineResult = (
     inputValue: { value: { key: string; value: string }; isMulti: boolean },
     existValue: ObjectString = {},
-  ) => {
+  ): Record<string, unknown> => {
     const { isMulti } = inputValue;
     const { key, value } = inputValue.value;
 
@@ -180,12 +179,12 @@ export class TagToolInstanceAdaptor extends React.Component<
 
       const valuesSet = new Set(valuesArray);
       existValue[key] = Array.from(valuesSet).join(';');
-      return _.pickBy(existValue, (v) => v);
+      return pickBy(existValue, (v) => v);
     }
 
     existValue[key] = existValue[key] === value ? undefined : value;
 
-    return _.pickBy(existValue, (v) => v);
+    return pickBy(existValue, (v) => v);
   };
 
   public setResult = (tagResult: any[]) => {
@@ -193,8 +192,8 @@ export class TagToolInstanceAdaptor extends React.Component<
       tagResult,
     });
 
-    if (this.fns['render']) {
-      this.fns['render']();
+    if (this.fns.render) {
+      this.fns.render();
     }
   };
 
@@ -212,7 +211,7 @@ export class TagToolInstanceAdaptor extends React.Component<
     if (keyCode) {
       const keyIndex = keyCode - 1;
 
-      if ((this.config as tagToolConfig).inputList.length === 1) {
+      if ((this.config as TagToolConfig).inputList.length === 1) {
         // 说明标签只有一层
         this.labelSelectedList = [0, keyIndex];
         this.setLabel(0, keyIndex);
@@ -298,7 +297,7 @@ export class TagToolInstanceAdaptor extends React.Component<
             this.videoRef = video;
           }}
         />
-        <VideoTagLayer result={tagResult} inputList={(this.config as tagToolConfig)?.inputList} />
+        <VideoTagLayer result={tagResult} inputList={(this.config as TagToolConfig)?.inputList} />
       </div>
     );
   }

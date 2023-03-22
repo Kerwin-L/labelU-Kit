@@ -1,4 +1,4 @@
-import { EToolName } from './tool';
+import type { EToolName } from './tool';
 
 const rectToolConfig = {
   showConfirm: false,
@@ -56,7 +56,7 @@ const lineToolConfig = {
   lineType: 0,
   lineColor: 0,
   edgeAdsorption: false,
-  outOfTarget: true,
+  enableOutOfTarget: true,
   copyBackwardResult: false,
   isShowOrder: false,
   attributeConfigurable: false,

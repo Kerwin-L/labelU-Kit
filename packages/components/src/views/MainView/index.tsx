@@ -1,26 +1,24 @@
-import { AppProps } from '@/App';
+import { cTool } from '@label-u/annotation';
+import { Layout } from 'antd';
+import classNames from 'classnames';
+import React, { useEffect, useState } from 'react';
+import { connect } from 'react-redux';
+
+import type { AppProps } from '@/App';
 import { ViewportProvider } from '@/components/customResizeHook';
+import VideoAnnotate from '@/components/videoAnnotate';
 import { prefix } from '@/constant';
-import { Spin } from 'antd';
-import { Layout } from 'antd/es';
-import _ from 'lodash';
-import React from 'react';
+import type { AppState } from '@/store';
+import type { IFileItem } from '@/types/data';
+
 import AnnotationOperation from './annotationOperation';
 import AnnotationTips from './annotationTips';
 // import Sidebar from './sidebar';
+import AttributeOperation from './attributeOperation';
+import LeftSider from './leftSiderBar';
 import RightSiderbar from './rightSiderBar';
 import ToolFooter from './toolFooter';
 import ToolHeader from './toolHeader';
-// import { getStepConfig } from '@/store/annotation/reducer';
-import { cTool } from '@label-u/annotation';
-// import { ChangeSave } from '../../store/annotation/actionCreators';
-import VideoAnnotate from '@/components/videoAnnotate';
-import { AppState } from '@/store';
-import { connect } from 'react-redux';
-import AttributeOperation from './attributeOperation';
-import { IFileItem } from '@/types/data';
-import LeftSider from './leftSiderBar';
-import classNames from 'classnames';
 
 const { EVideoToolName } = cTool;
 
@@ -31,6 +29,7 @@ interface IProps {
   currentToolName: string;
   imgIndex: string;
   imgListCollapse: boolean;
+  style?: React.CSSProperties;
 }
 
 const { Sider, Content } = Layout;
@@ -58,42 +57,44 @@ const AnnotatedArea: React.FC<AppProps & IProps & { currentToolName: string }> =
 };
 
 const MainView: React.FC<AppProps & IProps> = (props) => {
-  // const dispatch = useDispatch();
   const { currentToolName } = props;
+  const [, setBoxWidth] = useState<number>();
+  useEffect(() => {
+    const boxParent = document.getElementById('annotationCotentAreaIdtoGetBox')?.parentNode as HTMLElement;
+    setBoxWidth(boxParent.clientWidth);
+  }, []);
+
   // 取消加载时loading
   return (
     <ViewportProvider>
-      <Spin spinning={false}>
-        <Layout
-          className={classNames({
-            'lab-layout': true,
-            'lab-layout-preview': props.isPreview,
-          })}
-          style={props.style?.layout}
-        >
-          <header className={`${layoutCls}__header`} style={props.style?.header}>
-            <ToolHeader
-              isPreview={props?.isPreview}
-              header={props?.header}
-              headerName={props.headerName}
-              goBack={props.goBack}
-              exportData={props.exportData}
-              topActionContent={props.topActionContent}
-            />
-          </header>
-          <AttributeOperation />
-          <Layout>
-            {<LeftSider {...props} />}
-            <Content className={`${layoutCls}__content`}>
-              <AnnotatedArea {...props} currentToolName={currentToolName} />
-            </Content>
-            <Sider className={`${layoutCls}__side`} width='auto' style={props.style?.sider}>
-              {/* <Sidebar sider={props?.sider} /> */}
-              <RightSiderbar isPreview={props?.isPreview as boolean} />
-            </Sider>
-          </Layout>
+      <Layout
+        className={classNames({
+          'lab-layout': true,
+        })}
+        style={props.style?.layout}
+      >
+        <header className={`${layoutCls}__header`} style={props.style?.header}>
+          <ToolHeader
+            isPreview={props?.isPreview}
+            header={props?.header}
+            headerName={props.headerName}
+            goBack={props.goBack}
+            exportData={props.exportData}
+            topActionContent={props.topActionContent}
+          />
+        </header>
+        <AttributeOperation />
+        <Layout>
+          {<LeftSider {...props} />}
+          <Content className={`${layoutCls}__content`}>
+            <AnnotatedArea {...props} currentToolName={currentToolName} />
+          </Content>
+          <Sider className={`${layoutCls}__side`} width="auto" style={props.style?.sider ?? {}}>
+            {/* <Sidebar sider={props?.sider} /> */}
+            <RightSiderbar isPreview={props?.isPreview as boolean} />
+          </Sider>
         </Layout>
-      </Spin>
+      </Layout>
     </ViewportProvider>
   );
 };
